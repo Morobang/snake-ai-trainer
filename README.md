@@ -1,6 +1,8 @@
 # 🐍 Snake AI Trainer
 
-A browser-based Snake game with a **Q-learning AI agent** that trains in real time. Watch it fail hundreds of times, then slowly figure out how to survive — no backend, no install, just open `index.html`.
+**[▶ Play it live →](https://morobang.github.io/snake-ai-trainer/)**
+
+A browser-based Snake game with a **Q-learning AI agent** that trains in real time. Watch it fail hundreds of times, then slowly figure out how to survive — no backend, no install, just open the link.
 
 ---
 
@@ -24,6 +26,7 @@ The AI uses a **Q-table** (not a neural net) so training is fast enough to watch
 - 👻 Ghost replay of the AI's best run ever
 - ⚡ Speed slider — slow-mo to watch decisions, 100x to train fast
 - 🏆 You vs AI mode — race the trained agent after training
+- 💾 Q-table persists in localStorage — training survives page refresh
 
 ---
 
@@ -44,7 +47,7 @@ This is called **Q-learning** — a classic reinforcement learning algorithm.
 
 ```
 snake-ai-trainer/
-├── index.html          ← entire game + AI, single file, open and play
+├── index.html          ← entire game + AI, single file
 ├── docs/
 │   └── architecture.md ← technical deep-dive on the Q-learning setup
 └── README.md
@@ -52,19 +55,25 @@ snake-ai-trainer/
 
 ---
 
-## Run It
+## Run It Locally
 
-Just open `index.html` in any modern browser. No server needed.
+Just clone and open `index.html` in any modern browser. No server needed.
+
+```bash
+git clone https://github.com/Morobang/snake-ai-trainer.git
+cd snake-ai-trainer
+open index.html
+```
 
 ---
 
 ## Roadmap
 
 - [x] Repo setup
-- [ ] Phase 1 — Playable Snake game with stats
-- [ ] Phase 2 — Q-learning agent + training loop
-- [ ] Phase 3 — Live visualizer (stats panel, chart, heatmap)
-- [ ] Phase 4 — You vs AI race mode
+- [x] Phase 1 — Playable Snake game with stats
+- [x] Phase 2 — Q-learning agent + training loop
+- [x] Phase 3 — Live visualizer (stats panel, chart, heatmap)
+- [x] Phase 4 — You vs AI race mode
 
 ---
 
