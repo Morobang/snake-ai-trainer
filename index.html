@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake AI Trainer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0a0f;
+    --panel:     #111118;
+    --border:    #1e1e2e;
+    --green:     #00ff88;
+    --green-dim: #00cc66;
+    --red:       #ff4466;
+    --yellow:    #ffcc00;
+    --blue:      #4488ff;
+    --text:      #c8c8d8;
+    --text-dim:  #666680;
+    --font:      'JetBrains Mono', monospace;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  /* ── LAYOUT ── */
+  #app {
+    display: grid;
+    grid-template-rows: 48px 1fr;
+    grid-template-columns: 1fr 300px;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .logo {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--green);
+  }
+  .logo span { color: var(--text-dim); font-weight: 300; }
+
+  .mode-tabs {
+    display: flex;
+    gap: 2px;
+  }
+
+  .tab {
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--font);
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+  .tab:first-child { border-radius: 4px 0 0 4px; }
+  .tab:last-child  { border-radius: 0 4px 4px 0; }
+  .tab.active {
+    background: var(--green);
+    color: var(--bg);
+    border-color: var(--green);
+    font-weight: 700;
+  }
+  .tab:hover:not(.active) { border-color: var(--green-dim); color: var(--text); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* ── MAIN CANVAS AREA ── */
+  #canvas-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .canvas-wrap {
+    position: relative;
+  }
+
+  canvas {
+    display: block;
+    border: 1px solid var(--border);
+    image-rendering: pixelated;
+  }
+
+  #game-canvas { border-color: var(--green-dim); }
+
+  /* overlay for mode messages */
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10,10,15,0.88);
+    gap: 12px;
+  }
+  #overlay.hidden { display: none; }
+  #overlay-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: 0.06em;
+  }
+  #overlay-sub {
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .btn {
+    padding: 10px 28px;
+    border: 1px solid var(--green);
+    background: transparent;
+    color: var(--green);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 3px;
+  }
+  .btn:hover { background: var(--green); color: var(--bg); }
+  .btn.danger { border-color: var(--red); color: var(--red); }
+  .btn.danger:hover { background: var(--red); color: #fff; }
+
+  /* speed control */
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 120px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--green);
+    cursor: pointer;
+  }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* stat grid */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+  }
+  .stat-val {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--green);
+    line-height: 1;
+  }
+  .stat-val.red   { color: var(--red); }
+  .stat-val.yellow{ color: var(--yellow); }
+  .stat-val.blue  { color: var(--blue); }
+  .stat-lbl {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    letter-spacing: 0.06em;
+  }
+
+  /* chart */
+  #chart-canvas {
+    width: 100%;
+    height: 90px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+
+  /* heatmap */
+  #heatmap-canvas {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    image-rendering: pixelated;
+  }
+
+  /* action buttons */
+  .btn-row {
+    display: flex;
+    gap: 6px;
+  }
+  .btn-sm {
+    flex: 1;
+    padding: 7px 0;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .btn-sm:hover { border-color: var(--green); color: var(--green); }
+  .btn-sm.active-btn { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.07); }
+  .btn-sm.red-btn { border-color: var(--red); color: var(--red); }
+  .btn-sm.red-btn:hover { background: rgba(255,68,102,0.1); }
+
+  /* epsilon bar */
+  .epsilon-wrap {
+    margin-top: 6px;
+  }
+  .epsilon-bar-bg {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .epsilon-bar-fill {
+    height: 100%;
+    background: var(--yellow);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .epsilon-lbl {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* sidebar scroll */
+  #sidebar-scroll {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* race mode */
+  #race-area {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .race-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .race-label.you { color: var(--blue); }
+  .race-label.ai  { color: var(--green); }
+
+  /* keyboard hint */
+  #key-hint {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  .pulse {
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">SNAKE<span>_AI</span></div>
+
+    <div class="mode-tabs">
+      <button class="tab active" onclick="setMode('play')">PLAY</button>
+      <button class="tab" onclick="setMode('train')">TRAIN AI</button>
+      <button class="tab" onclick="setMode('race')">RACE</button>
+    </div>
+
+    <div class="header-right">
+      <span id="key-hint">↑ ↓ ← → to move</span>
+    </div>
+  </header>
+
+  <!-- CANVAS AREA -->
+  <div id="canvas-area">
+
+    <!-- PLAY MODE -->
+    <div id="play-area" class="canvas-wrap">
+      <canvas id="game-canvas" width="400" height="400"></canvas>
+      <div id="overlay">
+        <div id="overlay-title">SNAKE AI TRAINER</div>
+        <div id="overlay-sub">Use arrow keys to move. Don't die.</div>
+        <button class="btn" onclick="startPlayerGame()">START GAME</button>
+      </div>
+    </div>
+
+    <!-- TRAIN MODE (hidden initially) -->
+    <div id="train-area" style="display:none; flex-direction:column; align-items:center; gap:12px;">
+      <canvas id="train-canvas" width="400" height="400"></canvas>
+      <div id="controls">
+        <span>SLOW</span>
+        <input type="range" id="speed-slider" min="1" max="100" value="20" oninput="onSpeedChange()">
+        <span>FAST</span>
+        <span id="speed-label" style="color:var(--green); min-width:60px;">×20</span>
+      </div>
+    </div>
+
+    <!-- RACE MODE (hidden initially) -->
+    <div id="race-area-wrap" style="display:none;">
+      <div>
+        <div class="race-label you">YOU</div>
+        <canvas id="race-player-canvas" width="280" height="280"></canvas>
+      </div>
+      <div>
+        <div class="race-label ai">AI</div>
+        <canvas id="race-ai-canvas" width="280" height="280"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+
+    <!-- current run stats -->
+    <div class="sidebar-section">
+      <div class="section-label">Current Run</div>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-val" id="stat-score">0</div>
+          <div class="stat-lbl">SCORE</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val yellow" id="stat-moves">0</div>
+          <div class="stat-lbl">MOVES</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val blue" id="stat-time">0:00</div>
+          <div class="stat-lbl">TIME</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val red" id="stat-best">0</div>
+          <div class="stat-lbl">BEST</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sidebar-scroll">
+
+      <!-- AI stats (shown in train/race mode) -->
+      <div class="sidebar-section" id="ai-stats-section" style="display:none;">
+        <div class="section-label">AI Training</div>
+        <div class="stat-grid">
+          <div class="stat">
+            <div class="stat-val" id="stat-runs">0</div>
+            <div class="stat-lbl">RUNS</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val red" id="stat-deaths">0</div>
+            <div class="stat-lbl">DEATHS</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val yellow" id="stat-ai-best">0</div>
+            <div class="stat-lbl">AI BEST</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val blue" id="stat-avg">0</div>
+            <div class="stat-lbl">AVG (10)</div>
+          </div>
+        </div>
+
+        <!-- epsilon -->
+        <div class="epsilon-wrap" style="margin-top:10px;">
+          <div class="epsilon-lbl">
+            <span>EXPLORATION</span>
+            <span id="epsilon-val">100%</span>
+          </div>
+          <div class="epsilon-bar-bg">
+            <div class="epsilon-bar-fill" id="epsilon-bar" style="width:100%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- score chart -->
+      <div class="sidebar-section" id="chart-section" style="display:none;">
+        <div class="section-label">Score Per Run</div>
+        <canvas id="chart-canvas" height="90"></canvas>
+      </div>
+
+      <!-- heatmap -->
+      <div class="sidebar-section" id="heatmap-section" style="display:none;">
+        <div class="section-label">Death Heatmap</div>
+        <canvas id="heatmap-canvas" width="200" height="200"></canvas>
+      </div>
+
+      <!-- actions -->
+      <div class="sidebar-section">
+        <div class="section-label">Actions</div>
+        <div class="btn-row" id="action-btns">
+          <button class="btn-sm" id="btn-pause" onclick="togglePause()" style="display:none;">PAUSE</button>
+          <button class="btn-sm red-btn" id="btn-reset" onclick="resetAI()" style="display:none;">RESET AI</button>
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:var(--text-dim); line-height:1.6;" id="ai-tip">
+          Switch to TRAIN mode to start the AI agent.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════
+const GRID      = 20;
+const CELL      = 20;         // px per cell on 400px canvas
+const CELL_RACE = 14;         // px per cell on 280px race canvas
+
+const DIR = { UP:[0,-1], DOWN:[0,1], LEFT:[-1,0], RIGHT:[1,0] };
+const DIRS = ['UP','DOWN','LEFT','RIGHT'];
+
+// Q-learning hyper-params
+const ALPHA   = 0.1;    // learning rate
+const GAMMA   = 0.9;    // discount
+const EPS_MIN = 0.01;
+const EPS_DECAY = 0.995;
+
+// ══════════════════════════════════════════════
+//  Q-TABLE
+// ══════════════════════════════════════════════
+// State: 11 binary bits → 2048 states, 4 actions
+let qtable = loadQTable();
+let epsilon = parseFloat(localStorage.getItem('snake_epsilon') || '1.0');
+
+function stateKey(bits) {
+  // bits is array of 0/1 length 11 → integer 0-2047
+  let k = 0;
+  for (let i = 0; i < bits.length; i++) k = (k << 1) | bits[i];
+  return k;
+}
+
+function getState(snake, foodPos, gridSize) {
+  const head = snake[0];
+  const [dx, dy] = snake.length > 1
+    ? [head[0]-snake[1][0], head[1]-snake[1][1]]
+    : [0, -1]; // default up
+
+  // relative left/right/straight based on current direction
+  function isDir(d) { return dx===d[0] && dy===d[1]; }
+
+  // danger in a given absolute direction
+  function danger(ddx, ddy) {
+    const nx = head[0]+ddx, ny = head[1]+ddy;
+    if (nx<0||nx>=gridSize||ny<0||ny>=gridSize) return 1;
+    for (let i=1;i<snake.length;i++) if(snake[i][0]===nx&&snake[i][1]===ny) return 1;
+    return 0;
+  }
+
+  // straight / left / right relative to movement
+  let straight, leftDir, rightDir;
+  if (isDir(DIR.UP))         { straight=DIR.UP;    leftDir=DIR.LEFT;  rightDir=DIR.RIGHT; }
+  else if (isDir(DIR.DOWN))  { straight=DIR.DOWN;  leftDir=DIR.RIGHT; rightDir=DIR.LEFT; }
+  else if (isDir(DIR.LEFT))  { straight=DIR.LEFT;  leftDir=DIR.DOWN;  rightDir=DIR.UP; }
+  else                        { straight=DIR.RIGHT; leftDir=DIR.UP;    rightDir=DIR.DOWN; }
+
+  const bits = [
+    danger(...straight),
+    danger(...leftDir),
+    danger(...rightDir),
+    isDir(DIR.UP)    ?1:0,
+    isDir(DIR.DOWN)  ?1:0,
+    isDir(DIR.LEFT)  ?1:0,
+    isDir(DIR.RIGHT) ?1:0,
+    foodPos[1] < head[1] ?1:0,  // food up
+    foodPos[1] > head[1] ?1:0,  // food down
+    foodPos[0] < head[0] ?1:0,  // food left
+    foodPos[0] > head[0] ?1:0,  // food right
+  ];
+  return stateKey(bits);
+}
+
+function getBestAction(state) {
+  const row = qtable[state];
+  let best = 0;
+  for (let i=1;i<4;i++) if (row[i]>row[best]) best=i;
+  return best;
+}
+
+function updateQ(s, a, r, sNext) {
+  const maxNext = Math.max(...qtable[sNext]);
+  qtable[s][a] += ALPHA * (r + GAMMA*maxNext - qtable[s][a]);
+}
+
+function loadQTable() {
+  try {
+    const saved = localStorage.getItem('snake_qtable');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return Array.from({length:2048}, ()=>[0,0,0,0]);
+}
+
+function saveQTable() {
+  localStorage.setItem('snake_qtable', JSON.stringify(qtable));
+  localStorage.setItem('snake_epsilon', epsilon.toString());
+}
+
+function resetAI() {
+  if (!confirm('Reset AI brain and all training data?')) return;
+  qtable = Array.from({length:2048}, ()=>[0,0,0,0]);
+  epsilon = 1.0;
+  aiRuns = 0; aiDeaths = 0; aiScoreHistory = []; aiAllTimeBest = 0;
+  heatmap = Array.from({length:GRID}, ()=>new Array(GRID).fill(0));
+  localStorage.removeItem('snake_qtable');
+  localStorage.removeItem('snake_epsilon');
+  updateSidebarAI();
+  drawHeatmap();
+  drawChart();
+}
+
+// ══════════════════════════════════════════════
+//  GAME CORE
+// ══════════════════════════════════════════════
+function makeSnake(gridSize) {
+  const cx = Math.floor(gridSize/2);
+  const cy = Math.floor(gridSize/2);
+  return [[cx,cy],[cx,cy+1],[cx,cy+2]];
+}
+
+function spawnFood(snake, gridSize) {
+  let f;
+  do {
+    f = [Math.floor(Math.random()*gridSize), Math.floor(Math.random()*gridSize)];
+  } while (snake.some(s=>s[0]===f[0]&&s[1]===f[1]));
+  return f;
+}
+
+function moveSnake(snake, dir, food, gridSize) {
+  const head = snake[0];
+  const newHead = [head[0]+dir[0], head[1]+dir[1]];
+
+  // wall collision
+  if (newHead[0]<0||newHead[0]>=gridSize||newHead[1]<0||newHead[1]>=gridSize)
+    return {dead:true, ate:false, snake};
+
+  // self collision
+  if (snake.some(s=>s[0]===newHead[0]&&s[1]===newHead[1]))
+    return {dead:true, ate:false, snake};
+
+  const ate = newHead[0]===food[0] && newHead[1]===food[1];
+  const newSnake = [newHead, ...snake];
+  if (!ate) newSnake.pop();
+
+  return {dead:false, ate, snake:newSnake};
+}
+
+// ══════════════════════════════════════════════
+//  RENDERING
+// ══════════════════════════════════════════════
+const COLORS = {
+  bg:      '#0a0a0f',
+  grid:    '#0f0f1a',
+  snake:   '#00ff88',
+  snakeDim:'#00cc66',
+  head:    '#ffffff',
+  food:    '#ffcc00',
+  dead:    '#ff4466',
+};
+
+function drawGame(ctx, snake, food, gridSize, cellSize, isDead, ghostSnake) {
+  const W = gridSize * cellSize;
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0,0,W,W);
+
+  // grid lines
+  ctx.strokeStyle = COLORS.grid;
+  ctx.lineWidth = 0.5;
+  for (let i=0;i<=gridSize;i++) {
+    ctx.beginPath(); ctx.moveTo(i*cellSize,0); ctx.lineTo(i*cellSize,W); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*cellSize); ctx.lineTo(W,i*cellSize); ctx.stroke();
+  }
+
+  // ghost (best run replay)
+  if (ghostSnake) {
+    ghostSnake.forEach((s,i) => {
+      ctx.fillStyle = i===0 ? 'rgba(68,136,255,0.4)' : 'rgba(68,136,255,0.15)';
+      ctx.fillRect(s[0]*cellSize+1, s[1]*cellSize+1, cellSize-2, cellSize-2);
+    });
+  }
+
+  // food
+  const fc = cellSize*0.35;
+  const fx = food[0]*cellSize + cellSize/2;
+  const fy = food[1]*cellSize + cellSize/2;
+  ctx.fillStyle = COLORS.food;
+  ctx.beginPath();
+  ctx.arc(fx, fy, fc, 0, Math.PI*2);
+  ctx.fill();
+  // glow
+  ctx.shadowColor = COLORS.food;
+  ctx.shadowBlur = 8;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // snake
+  snake.forEach((s,i) => {
+    if (isDead) {
+      ctx.fillStyle = i===0 ? COLORS.dead : `rgba(255,68,102,${0.7-i*0.02})`;
+    } else {
+      ctx.fillStyle = i===0 ? COLORS.head : (i===1 ? COLORS.snake : COLORS.snakeDim);
+    }
+    const pad = i===0 ? 1 : 2;
+    ctx.fillRect(s[0]*cellSize+pad, s[1]*cellSize+pad, cellSize-pad*2, cellSize-pad*2);
+
+    // head glow
+    if (i===0 && !isDead) {
+      ctx.shadowColor = COLORS.snake;
+      ctx.shadowBlur = 10;
+      ctx.fillRect(s[0]*cellSize+pad, s[1]*cellSize+pad, cellSize-pad*2, cellSize-pad*2);
+      ctx.shadowBlur = 0;
+    }
+  });
+}
+
+// ══════════════════════════════════════════════
+//  PLAYER MODE
+// ══════════════════════════════════════════════
+let playerSnake, playerFood, playerDir, playerNextDir;
+let playerScore, playerMoves, playerStartTime, playerTimer;
+let playerBest = parseInt(localStorage.getItem('snake_player_best') || '0');
+let playerGameRunning = false;
+
+const gameCanvas = document.getElementById('game-canvas');
+const gameCtx    = gameCanvas.getContext('2d');
+const overlay    = document.getElementById('overlay');
+const overlayTitle = document.getElementById('overlay-title');
+const overlaySub   = document.getElementById('overlay-sub');
+
+function startPlayerGame() {
+  playerSnake   = makeSnake(GRID);
+  playerFood    = spawnFood(playerSnake, GRID);
+  playerDir     = DIR.UP;
+  playerNextDir = DIR.UP;
+  playerScore   = 0;
+  playerMoves   = 0;
+  playerStartTime = Date.now();
+  playerGameRunning = true;
+  overlay.classList.add('hidden');
+  clearInterval(playerTimer);
+  playerTimer = setInterval(playerTick, 120);
+}
+
+function playerTick() {
+  playerDir = playerNextDir;
+  const {dead, ate, snake} = moveSnake(playerSnake, playerDir, playerFood, GRID);
+  playerMoves++;
+
+  if (dead) {
+    playerGameRunning = false;
+    clearInterval(playerTimer);
+    drawGame(gameCtx, playerSnake, playerFood, GRID, CELL, true);
+    if (playerScore > playerBest) {
+      playerBest = playerScore;
+      localStorage.setItem('snake_player_best', playerBest);
+    }
+    overlayTitle.textContent = `SCORE: ${playerScore}`;
+    overlaySub.textContent   = `Moves: ${playerMoves} · Best: ${playerBest}`;
+    overlay.classList.remove('hidden');
+    const btn = overlay.querySelector('button');
+    btn.textContent = 'PLAY AGAIN';
+    return;
+  }
+
+  playerSnake = snake;
+  if (ate) {
+    playerScore++;
+    playerFood = spawnFood(playerSnake, GRID);
+  }
+
+  drawGame(gameCtx, playerSnake, playerFood, GRID, CELL, false);
+  updatePlayerStats();
+}
+
+function updatePlayerStats() {
+  document.getElementById('stat-score').textContent = playerScore;
+  document.getElementById('stat-moves').textContent = playerMoves;
+  const elapsed = Math.floor((Date.now()-playerStartTime)/1000);
+  const mm = Math.floor(elapsed/60), ss = elapsed%60;
+  document.getElementById('stat-time').textContent = `${mm}:${ss.toString().padStart(2,'0')}`;
+  document.getElementById('stat-best').textContent = playerBest;
+}
+
+document.addEventListener('keydown', e => {
+  if (currentMode === 'play' && playerGameRunning) {
+    const map = {
+      ArrowUp:DIR.UP, ArrowDown:DIR.DOWN,
+      ArrowLeft:DIR.LEFT, ArrowRight:DIR.RIGHT,
+      w:DIR.UP, s:DIR.DOWN, a:DIR.LEFT, d:DIR.RIGHT
+    };
+    const d = map[e.key];
+    if (!d) return;
+    e.preventDefault();
+    // prevent 180
+    if (d[0]===-playerDir[0] && d[1]===-playerDir[1]) return;
+    playerNextDir = d;
+  }
+});
+
+// ══════════════════════════════════════════════
+//  AI TRAIN MODE
+// ══════════════════════════════════════════════
+let aiSnake, aiFood, aiDir, aiScore;
+let aiRuns = 0, aiDeaths = 0;
+let aiScoreHistory = [];
+let aiAllTimeBest = parseInt(localStorage.getItem('snake_ai_best') || '0');
+let aiTraining = false;
+let aiTimer = null;
+let aiPaused = false;
+let speedMs = 50;   // ms per tick (lower = faster)
+let heatmap = Array.from({length:GRID}, ()=>new Array(GRID).fill(0));
+let ghostSnake = null;
+let ghostCandidate = null;
+
+// track moves without food to detect loops
+let aiMovesSinceFood = 0;
+const MAX_MOVES_WITHOUT_FOOD = GRID * GRID * 2;
+
+const trainCanvas = document.getElementById('train-canvas');
+const trainCtx    = trainCanvas.getContext('2d');
+
+function startAITraining() {
+  if (aiTraining) return;
+  aiTraining = true;
+  aiPaused   = false;
+  resetAIEpisode();
+  scheduleAITick();
+  document.getElementById('btn-pause').style.display = '';
+  document.getElementById('btn-reset').style.display = '';
+  document.getElementById('btn-pause').textContent = 'PAUSE';
+}
+
+function resetAIEpisode() {
+  aiSnake = makeSnake(GRID);
+  aiFood  = spawnFood(aiSnake, GRID);
+  aiDir   = DIR.UP;
+  aiScore = 0;
+  aiMovesSinceFood = 0;
+  ghostCandidate = [aiSnake[0].slice()];
+}
+
+function scheduleAITick() {
+  if (!aiTraining) return;
+  aiTimer = setTimeout(() => {
+    if (!aiPaused) aiTick();
+    scheduleAITick();
+  }, speedMs);
+}
+
+function aiTick() {
+  const state = getState(aiSnake, aiFood, GRID);
+
+  // epsilon-greedy action
+  let actionIdx;
+  if (Math.random() < epsilon) {
+    actionIdx = Math.floor(Math.random()*4);
+  } else {
+    actionIdx = getBestAction(state);
+  }
+
+  const newDir = DIR[DIRS[actionIdx]];
+  // prevent 180
+  const head = aiSnake[0];
+  const curDx = aiSnake.length>1 ? head[0]-aiSnake[1][0] : aiDir[0];
+  const curDy = aiSnake.length>1 ? head[1]-aiSnake[1][1] : aiDir[1];
+  const finalDir = (newDir[0]===-curDx && newDir[1]===-curDy) ? aiDir : newDir;
+  aiDir = finalDir;
+
+  // distance to food before
+  const distBefore = Math.abs(head[0]-aiFood[0]) + Math.abs(head[1]-aiFood[1]);
+
+  const {dead, ate, snake} = moveSnake(aiSnake, finalDir, aiFood, GRID);
+  aiMovesSinceFood++;
+
+  let reward;
+  let episodeDone = dead || aiMovesSinceFood > MAX_MOVES_WITHOUT_FOOD;
+
+  if (dead) {
+    reward = -10;
+    heatmap[aiSnake[0][1]][aiSnake[0][0]]++;
+    aiDeaths++;
+    aiRuns++;
+    // decay epsilon
+    epsilon = Math.max(EPS_MIN, epsilon * EPS_DECAY);
+  } else if (ate) {
+    reward = 10;
+    aiScore++;
+    aiMovesSinceFood = 0;
+  } else if (aiMovesSinceFood > MAX_MOVES_WITHOUT_FOOD) {
+    reward = -5; // penalise looping
+    aiRuns++;
+  } else {
+    // small reward for moving toward food
+    const newHead = snake[0];
+    const distAfter = Math.abs(newHead[0]-aiFood[0]) + Math.abs(newHead[1]-aiFood[1]);
+    reward = distAfter < distBefore ? 1 : -1;
+  }
+
+  if (!dead) aiSnake = snake;
+  if (ate) aiFood = spawnFood(aiSnake, GRID);
+
+  // Q-update
+  const nextState = episodeDone ? 0 : getState(aiSnake, aiFood, GRID);
+  updateQ(state, actionIdx, reward, nextState);
+
+  // ghost tracking
+  if (ghostCandidate) ghostCandidate.push(aiSnake[0].slice());
+
+  // render
+  drawGame(trainCtx, aiSnake, aiFood, GRID, CELL, dead, ghostSnake);
+
+  if (episodeDone) {
+    aiScoreHistory.push(aiScore);
+    if (aiScore > aiAllTimeBest) {
+      aiAllTimeBest = aiScore;
+      ghostSnake = ghostCandidate ? [...ghostCandidate] : null;
+      localStorage.setItem('snake_ai_best', aiAllTimeBest);
+    }
+    if (aiScoreHistory.length % 20 === 0) saveQTable();
+    updateSidebarAI();
+    drawChart();
+    drawHeatmap();
+    resetAIEpisode();
+  }
+
+  updatePlayerStats(); // reuse for current run score
+  document.getElementById('stat-score').textContent = aiScore;
+  document.getElementById('stat-moves').textContent = aiMovesSinceFood;
+}
+
+function togglePause() {
+  aiPaused = !aiPaused;
+  document.getElementById('btn-pause').textContent = aiPaused ? 'RESUME' : 'PAUSE';
+  document.getElementById('btn-pause').classList.toggle('active-btn', aiPaused);
+}
+
+function onSpeedChange() {
+  const v = parseInt(document.getElementById('speed-slider').value);
+  // v=1 → 500ms (slow), v=100 → 5ms (fast)
+  speedMs = Math.round(500 - (v-1)*(495/99));
+  document.getElementById('speed-label').textContent = `×${v}`;
+}
+
+function updateSidebarAI() {
+  document.getElementById('stat-runs').textContent   = aiRuns;
+  document.getElementById('stat-deaths').textContent = aiDeaths;
+  document.getElementById('stat-ai-best').textContent= aiAllTimeBest;
+
+  const last10 = aiScoreHistory.slice(-10);
+  const avg = last10.length ? Math.round(last10.reduce((a,b)=>a+b,0)/last10.length) : 0;
+  document.getElementById('stat-avg').textContent = avg;
+
+  const epPct = Math.round(epsilon*100);
+  document.getElementById('epsilon-val').textContent = epPct+'%';
+  document.getElementById('epsilon-bar').style.width = epPct+'%';
+}
+
+// ── CHART ──
+function drawChart() {
+  const canvas = document.getElementById('chart-canvas');
+  const ctx    = canvas.getContext('2d');
+  const W = canvas.offsetWidth * devicePixelRatio || 268;
+  const H = 90;
+  canvas.width = W; canvas.height = H;
+
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0,0,W,H);
+
+  if (aiScoreHistory.length < 2) return;
+
+  const data = aiScoreHistory.slice(-100);
+  const maxVal = Math.max(...data, 1);
+  const step = W / (data.length-1);
+
+  // area fill
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  data.forEach((v,i) => ctx.lineTo(i*step, H - (v/maxVal)*(H-8)));
+  ctx.lineTo((data.length-1)*step, H);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,255,136,0.08)';
+  ctx.fill();
+
+  // line
+  ctx.beginPath();
+  data.forEach((v,i) => {
+    const x = i*step, y = H - (v/maxVal)*(H-8);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = '#00ff88';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+// ── HEATMAP ──
+function drawHeatmap() {
+  const canvas = document.getElementById('heatmap-canvas');
+  const ctx    = canvas.getContext('2d');
+  canvas.width = GRID; canvas.height = GRID;
+
+  const maxVal = Math.max(1, ...heatmap.flat());
+
+  for (let y=0; y<GRID; y++) {
+    for (let x=0; x<GRID; x++) {
+      const intensity = heatmap[y][x] / maxVal;
+      if (intensity === 0) {
+        ctx.fillStyle = '#0a0a0f';
+      } else {
+        // black → deep red → bright red → orange → yellow
+        const r = Math.round(255 * Math.min(1, intensity * 2));
+        const g = Math.round(180 * Math.max(0, intensity - 0.5) * 2);
+        ctx.fillStyle = `rgb(${r},${g},0)`;
+      }
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+//  RACE MODE
+// ══════════════════════════════════════════════
+let racePlayerSnake, racePlayerFood, racePlayerDir, racePlayerNextDir, racePlayerScore;
+let raceAISnake, raceAIFood, raceAIDir, raceAIScore;
+let racePlayerDead, raceAIDead;
+let raceTimer;
+let raceMovesSinceFood = 0;
+
+const racePlayerCanvas = document.getElementById('race-player-canvas');
+const racePlayerCtx    = racePlayerCanvas.getContext('2d');
+const raceAICanvas     = document.getElementById('race-ai-canvas');
+const raceAICtx        = raceAICanvas.getContext('2d');
+
+function startRace() {
+  racePlayerSnake = makeSnake(GRID);
+  racePlayerFood  = spawnFood(racePlayerSnake, GRID);
+  racePlayerDir   = DIR.UP; racePlayerNextDir = DIR.UP;
+  racePlayerScore = 0; racePlayerDead = false;
+
+  raceAISnake = makeSnake(GRID);
+  raceAIFood  = spawnFood(raceAISnake, GRID);
+  raceAIDir   = DIR.UP;
+  raceAIScore = 0; raceAIDead = false;
+  raceMovesSinceFood = 0;
+
+  clearInterval(raceTimer);
+  raceTimer = setInterval(raceTick, 120);
+}
+
+function raceTick() {
+  // player
+  if (!racePlayerDead) {
+    racePlayerDir = racePlayerNextDir;
+    const r = moveSnake(racePlayerSnake, racePlayerDir, racePlayerFood, GRID);
+    if (r.dead) { racePlayerDead = true; }
+    else {
+      racePlayerSnake = r.snake;
+      if (r.ate) { racePlayerScore++; racePlayerFood = spawnFood(racePlayerSnake, GRID); }
+    }
+    drawGame(racePlayerCtx, racePlayerSnake, racePlayerFood, GRID, CELL_RACE, racePlayerDead);
+  }
+
+  // AI
+  if (!raceAIDead) {
+    const state = getState(raceAISnake, raceAIFood, GRID);
+    const actionIdx = getBestAction(state); // greedy — no exploration
+    const newDir = DIR[DIRS[actionIdx]];
+    const head = raceAISnake[0];
+    const curDx = raceAISnake.length>1 ? head[0]-raceAISnake[1][0] : raceAIDir[0];
+    const curDy = raceAISnake.length>1 ? head[1]-raceAISnake[1][1] : raceAIDir[1];
+    raceAIDir = (newDir[0]===-curDx && newDir[1]===-curDy) ? raceAIDir : newDir;
+
+    const r2 = moveSnake(raceAISnake, raceAIDir, raceAIFood, GRID);
+    if (r2.dead) { raceAIDead = true; }
+    else {
+      raceAISnake = r2.snake;
+      if (r2.ate) { raceAIScore++; raceAIFood = spawnFood(raceAISnake, GRID); }
+    }
+    drawGame(raceAICtx, raceAISnake, raceAIFood, GRID, CELL_RACE, raceAIDead);
+  }
+
+  document.getElementById('stat-score').textContent = racePlayerScore;
+  document.getElementById('stat-best').textContent  = raceAIScore;
+
+  if (racePlayerDead && raceAIDead) {
+    clearInterval(raceTimer);
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (currentMode === 'race') {
+    const map = {
+      ArrowUp:DIR.UP, ArrowDown:DIR.DOWN,
+      ArrowLeft:DIR.LEFT, ArrowRight:DIR.RIGHT,
+      w:DIR.UP, s:DIR.DOWN, a:DIR.LEFT, d:DIR.RIGHT
+    };
+    const d = map[e.key];
+    if (!d) return;
+    e.preventDefault();
+    if (d[0]===-racePlayerDir[0] && d[1]===-racePlayerDir[1]) return;
+    racePlayerNextDir = d;
+  }
+});
+
+// ══════════════════════════════════════════════
+//  MODE SWITCHING
+// ══════════════════════════════════════════════
+let currentMode = 'play';
+
+function setMode(mode) {
+  currentMode = mode;
+
+  // tabs
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // hide all areas
+  document.getElementById('play-area').style.display     = 'none';
+  document.getElementById('train-area').style.display    = 'none';
+  document.getElementById('race-area-wrap').style.display= 'none';
+
+  // hide AI sidebar sections
+  document.getElementById('ai-stats-section').style.display = 'none';
+  document.getElementById('chart-section').style.display    = 'none';
+  document.getElementById('heatmap-section').style.display  = 'none';
+  document.getElementById('btn-pause').style.display        = 'none';
+  document.getElementById('btn-reset').style.display        = 'none';
+
+  // stop timers
+  clearInterval(playerTimer);
+  clearInterval(raceTimer);
+  if (aiTraining) { clearTimeout(aiTimer); aiTraining = false; aiPaused = false; }
+
+  if (mode === 'play') {
+    document.getElementById('play-area').style.display = 'block';
+    document.getElementById('key-hint').textContent    = '↑ ↓ ← → to move';
+    document.getElementById('ai-tip').textContent      = 'Switch to TRAIN mode to start the AI agent.';
+    document.getElementById('stat-best').style.color   = 'var(--red)';
+    document.getElementById('stat-best').previousElementSibling.textContent = 'BEST';
+    overlay.classList.remove('hidden');
+    overlayTitle.textContent = 'SNAKE AI TRAINER';
+    overlaySub.textContent   = 'Use arrow keys to move. Don\'t die.';
+    overlay.querySelector('button').textContent = 'START GAME';
+    overlay.querySelector('button').onclick = startPlayerGame;
+    updatePlayerStats();
+  }
+
+  if (mode === 'train') {
+    document.getElementById('train-area').style.display       = 'flex';
+    document.getElementById('ai-stats-section').style.display = '';
+    document.getElementById('chart-section').style.display    = '';
+    document.getElementById('heatmap-section').style.display  = '';
+    document.getElementById('key-hint').textContent           = 'Watch the AI learn in real time';
+    document.getElementById('ai-tip').textContent             = 'Use the speed slider to control training pace. Ghost (blue) = AI\'s best run ever.';
+    document.getElementById('stat-best').style.color          = 'var(--yellow)';
+    document.getElementById('stat-best').previousElementSibling.textContent = 'AI BEST';
+    document.getElementById('stat-score').textContent         = '0';
+    document.getElementById('stat-moves').textContent         = '0';
+
+    updateSidebarAI();
+    drawChart();
+    drawHeatmap();
+
+    // draw empty board first
+    drawGame(trainCtx, makeSnake(GRID), spawnFood(makeSnake(GRID), GRID), GRID, CELL, false);
+    startAITraining();
+  }
+
+  if (mode === 'race') {
+    document.getElementById('race-area-wrap').style.display = 'flex';
+    document.getElementById('key-hint').textContent          = '↑ ↓ ← → to race the AI';
+    document.getElementById('ai-tip').textContent            = 'Train the AI first for a harder opponent. Your score vs AI score shown in the sidebar.';
+    document.getElementById('stat-score').textContent        = '0';
+    document.getElementById('stat-best').textContent         = '0';
+    document.getElementById('stat-best').style.color         = 'var(--green)';
+    document.getElementById('stat-best').previousElementSibling.textContent = 'AI SCORE';
+    startRace();
+  }
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+// Draw idle board on load
+drawGame(gameCtx, makeSnake(GRID), [10,5], GRID, CELL, false);
+updatePlayerStats();
+drawHeatmap();
+</script>
+</body>
+</html>
